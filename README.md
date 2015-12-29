@@ -12,8 +12,8 @@ Currently in Development
 
 ## TODO
 * \[ ] Document Existing
-  * \[ ] MCP
-  * \[ ] MOD
+  * \[X] MCP
+  * \[X] MOD
   * \[X] UPD
   * \[ ] Views
 * \[ ] Clean up/combine

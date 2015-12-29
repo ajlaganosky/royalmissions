@@ -125,6 +125,9 @@ class Royalmissions_upd {
 		else
 		{
 		}
+		
+		// ----------------------------------------------------------------
+		
 		if ($this->EE->dbutil->database_exists('royalmissions_user'))
 		{
 			$fields = array(
@@ -160,6 +163,9 @@ class Royalmissions_upd {
 		else
 		{			
 		}
+		
+		// ----------------------------------------------------------------
+		
 		if ($this->EE->dbutil->database_exists('royalmissions_sync'))
 		{
 			$fields = array(
@@ -181,14 +187,7 @@ class Royalmissions_upd {
 		}
 		else
 		{
-			
 		}
-		
-		//$this->EE->load->dbforge();
-		/**
-		 * In order to setup your custom tables, uncomment the line above, and 
-		 * start adding them below!
-		 */
 		
 		return TRUE;
 	}
@@ -209,16 +208,13 @@ class Royalmissions_upd {
 				
 		$this->EE->db->where('module_name', 'RoyalMissions')
 					 ->delete('modules');
-
+		
+		//Commented for testing
 		//$this->EE->load->dbforge();
 		//$this->EE->dbforge->drop_table('royalmissions');
 		//$this->EE->dbforge->drop_table('royalmissions_user');
 		//$this->EE->dbforge->drop_table('royalmissions_sync');
-				
-		// $this->EE->load->dbforge();
-		// Delete your custom tables & any ACT rows 
-		// you have in the actions table
-		
+						
 		return TRUE;
 	}
 	
