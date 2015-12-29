@@ -12,7 +12,7 @@ if ($total_count == 0) {
 else
 { ?>
 	<div class="tableFooter">
-		<p class="notice"><?='Sync\'d'?></p>
+		<p class="notice"><?="Sync'd"?></p>
 	</div>
 <?php
 }

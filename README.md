@@ -20,5 +20,7 @@ Currently in Development
   * \[ ] MCP
   * \[ ] Views
 * \[ ] Create ability for multiple transactions to be counted with commission rates
-* \[ ] (Optional) Find way to perform/include cron task
-* \[ ] (Optional) Remove hardcoded `col_id_#`
+* \[ ] (Optional) Add settings page
+  * \[ ] Set Percentage
+  * \[ ] Remove hardcoded `col_id_#`
+  * \[ ] Instruction to include cron task
