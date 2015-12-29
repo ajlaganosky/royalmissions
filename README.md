@@ -20,6 +20,10 @@ Currently in Development
   * \[ ] MCP
   * \[ ] Views
 * \[ ] Create ability for multiple transactions to be counted with commission rates
+* \[ ] Pagination
+* \[ ] Change verbiage to be less confusing
+* \[ ] Remove IDs and Replace with Names (Unique Identifiers)
+* \[ ] Search filter by initiator/created date/subscription/paid
 * \[ ] (Optional) Add settings page
   * \[ ] Set Percentage
   * \[ ] Remove hardcoded `col_id_#`
