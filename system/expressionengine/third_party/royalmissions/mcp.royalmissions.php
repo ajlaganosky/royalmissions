@@ -945,7 +945,7 @@ class Royalmissions_mcp {
 		}
 	}
 	
-	//Method associated with RoyalMissions in upd
+	//@@TODO - Reason
 	function profile_sync()
 	{
 		//Checks the DB tables... Members, Channel_Data, Royalmissions_User based off Members.member_id
