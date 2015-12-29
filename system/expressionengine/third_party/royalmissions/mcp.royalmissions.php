@@ -189,6 +189,153 @@ class Royalmissions_mcp {
 
 	}
 	
+	// ----------------------------------------------------------------
+
+	/**
+		*	Get Amount
+		*	
+		*	Does the % calculation of each subscription that has a referrer ID.
+		*
+		*	@return	% of subscription price
+	**/
+	function get_amount()
+	{
+    	$subscriptions = $this->EE->db->select('subscription_price as SP')
+			->from('membrr_subscriptions')
+			->where('member_id', $this->EE->input->post('referred_id'))
+			->where('plan_id', $this->EE->input->post('brr_plan_id'))
+			->where('active', 1)
+			->get();
+		
+		if($subscriptions->num_rows() > 0)
+		{
+	        foreach ($subscriptions->result_array() as $row)
+	        {
+			echo '<br>if<br>';
+			var_dump($row);
+		       $percent = ($this->EE->input->post('percentage')/100);
+		       $amount = ($row['SP']*$percent);
+		       $data4 = array(
+			   'amount' => $amount
+	           );
+			   $this->EE->db->where('referred_id', $this->EE->input->post('referred_id'));
+			   $this->EE->db->where('brr_plan_id', $this->EE->input->post('brr_plan_id'));
+			   $this->EE->db->update('royalmissions', $data4);
+			   
+			   return $data4['amount'];
+
+	        }
+	    }
+
+	}
+        
+	// ----------------------------------------------------------------
+
+	/**
+		*	Referral Section
+		*	
+		*	Does various actions for referrals
+		*
+	**/
+	
+	/* 
+		* Save process for edits and additions
+		* if update w/o paid status information is saved
+		* if update w/ paid status to yes, created date upped a year
+		* @return success
+	*/
+    function save_referral()
+    {
+    	if (empty($_POST))
+    	{
+    		show_error('unauthorized_access');
+    	}
+    	
+        unset($_POST['submit']);
+        $data = array();
+
+		foreach ($_POST as $key=>$val)
+        {
+        	if (is_array($val))
+        	{
+        		$data[$key] = serialize($val);
+        	}
+        	else
+        	{
+        		$data[$key] = $val;
+        	}
+        }
+        
+        $db_fields = $this->EE->db->list_fields('royalmissions');
+        foreach ($db_fields as $id=>$field)
+        {
+        	if (!isset($data[$field])) $data[$field] = '';
+        }
+      	
+		if ($this->EE->input->post('royal_id')!='')
+        {
+	        if ($this->EE->input->post('paid')==1)
+	        {
+	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
+				$this->EE->db->update('royalmissions', $data);
+				
+				$data2 = array(
+					'date_paid' => date('Y-m-d H:i:s')
+				);
+				
+	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
+		    	$this->EE->db->update('royalmissions', $data2);
+		    			    	
+		    	$checkcheck = $this->EE->db->select('exp_membrr_subscriptions.next_charge_date as charge','exp_royalmissions.referred_id as rID')
+		    		->from('membrr_subscriptions')
+		    		->join('royalmissions','exp_membrr_subscriptions.member_id = exp_royalmissions.referred_id')
+		    		->where('exp_membrr_subscriptions.member_id', $data['referred_id'])
+		    		->where('exp_membrr_subscriptions.next_charge_date >=', $data['brr_plan_paid_date'])
+		    		->where('exp_membrr_subscriptions.active', 1)
+		    		->where('exp_membrr_subscriptions.cancelled', 0)
+		    		->get();
+		    		
+		    	$total_count = $checkcheck->num_rows();
+		    	
+		    	if ($total_count >= 1)
+		    	{
+			    	$plusYear = date('Y-m-d', strtotime('+1 year', strtotime($data['created_date'])));
+			    	
+			    	$data3 = array(
+				    	'royal_id' => false,
+				    	'initiator_id' => $data['initiator_id'],	
+				    	'referred_id' => $data['referred_id'],
+				    	'created_date' => $plusYear,	
+				    	'percentage' => $data['percentage'],
+				    	'amount' => $this->get_amount($data4['amount']),
+				    	'paid' => 0,
+				    	'brr_plan_id' => $data['brr_plan_id'],
+				    	'date_paid' => date('Y-m-d H:i:s'),
+				    	'paid_check_id' => ''
+			    	);		    	
+			    	$this->EE->db->insert('royalmissions', $data3);
+		    	}
+	        }
+            else
+            {
+	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
+				$this->EE->db->update('royalmissions', $data);
+				$this->get_amount($data4['amount']);
+			}            
+            
+        }
+        else
+        {
+            $this->EE->db->insert('royalmissions', $data);
+            $this->get_amount($data4['amount']);
+        }
+                        
+        $this->EE->session->set_flashdata('message_success', 'updated');
+        
+        $this->EE->functions->redirect(BASE.AMP.'C=addons_modules'.AMP.'M=show_module_cp'.AMP.'module=royalmissions'.AMP.'method=index');
+    }
+
+	//Editing referral, initiator, referrred, plan, percentage, created date, amount due, paid status, and check number
 	function referral_edit()
 	{
 		$this->EE->load->helper('form');
@@ -355,128 +502,8 @@ class Royalmissions_mcp {
 
 	}
 	
-    function save_referral()
-    {
-    	if (empty($_POST))
-    	{
-    		show_error('unauthorized_access');
-    	}
-    	
-        unset($_POST['submit']);
-        $data = array();
-
-		foreach ($_POST as $key=>$val)
-        {
-        	if (is_array($val))
-        	{
-        		$data[$key] = serialize($val);
-        	}
-        	else
-        	{
-        		$data[$key] = $val;
-        	}
-        }
-        
-        $db_fields = $this->EE->db->list_fields('royalmissions');
-        foreach ($db_fields as $id=>$field)
-        {
-        	if (!isset($data[$field])) $data[$field] = '';
-        }
-      	
-		if ($this->EE->input->post('royal_id')!='')
-        {
-	        if ($this->EE->input->post('paid')==1)
-	        {
-	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
-				$this->EE->db->update('royalmissions', $data);
-				
-				$data2 = array(
-					'date_paid' => date('Y-m-d H:i:s')
-				);
-				
-	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
-		    	$this->EE->db->update('royalmissions', $data2);
-		    			    	
-		    	$checkcheck = $this->EE->db->select('exp_membrr_subscriptions.next_charge_date as charge','exp_royalmissions.referred_id as rID')
-		    		->from('membrr_subscriptions')
-		    		->join('royalmissions','exp_membrr_subscriptions.member_id = exp_royalmissions.referred_id')
-		    		->where('exp_membrr_subscriptions.member_id', $data['referred_id'])
-		    		->where('exp_membrr_subscriptions.next_charge_date >=', $data['brr_plan_paid_date'])
-		    		->where('exp_membrr_subscriptions.active', 1)
-		    		->where('exp_membrr_subscriptions.cancelled', 0)
-		    		->get();
-		    		
-		    	$total_count = $checkcheck->num_rows();
-		    	
-		    	if ($total_count >= 1)
-		    	{
-			    	$plusYear = date('Y-m-d', strtotime('+1 year', strtotime($data['created_date'])));
-			    	
-			    	$data3 = array(
-				    	'royal_id' => false,
-				    	'initiator_id' => $data['initiator_id'],	
-				    	'referred_id' => $data['referred_id'],
-				    	'created_date' => $plusYear,	
-				    	'percentage' => $data['percentage'],
-				    	'amount' => $this->get_amount($data4['amount']),
-				    	'paid' => 0,
-				    	'brr_plan_id' => $data['brr_plan_id'],
-				    	'date_paid' => date('Y-m-d H:i:s'),
-				    	'paid_check_id' => ''
-			    	);		    	
-			    	$this->EE->db->insert('royalmissions', $data3);
-		    	}
-	        }
-            else
-            {
-	            $this->EE->db->where('royal_id', $this->EE->input->post('royal_id'));
-				$this->EE->db->update('royalmissions', $data);
-				$this->get_amount($data4['amount']);
-			}            
-            
-        }
-        else
-        {
-            $this->EE->db->insert('royalmissions', $data);
-            $this->get_amount($data4['amount']);
-        }
-                        
-        $this->EE->session->set_flashdata('message_success', 'updated');
-        
-        $this->EE->functions->redirect(BASE.AMP.'C=addons_modules'.AMP.'M=show_module_cp'.AMP.'module=royalmissions'.AMP.'method=index');
-    }
-
-	function get_amount()
-	{
-    	$subscriptions = $this->EE->db->select('subscription_price as SP')
-			->from('membrr_subscriptions')
-			->where('member_id', $this->EE->input->post('referred_id'))
-			->where('plan_id', $this->EE->input->post('brr_plan_id'))
-			->where('active', 1)
-			->get();
-		
-		if($subscriptions->num_rows() > 0)
-		{
-	        foreach ($subscriptions->result_array() as $row)
-	        {
-			echo '<br>if<br>';
-			var_dump($row);
-		       $percent = ($this->EE->input->post('percentage')/100);
-		       $amount = ($row['SP']*$percent);
-		       $data4 = array(
-			   'amount' => $amount
-	           );
-			   $this->EE->db->where('referred_id', $this->EE->input->post('referred_id'));
-			   $this->EE->db->where('brr_plan_id', $this->EE->input->post('brr_plan_id'));
-			   $this->EE->db->update('royalmissions', $data4);
-			   
-			   return $data4['amount'];
-
-	        }
-	    }
-
-	}
-        
+	//	Delete referral entry, no remaining results in db
+	//	@return success or failure
     function delete_referral()
     {
 		$success = false;
@@ -500,7 +527,17 @@ class Royalmissions_mcp {
         $this->EE->functions->redirect(BASE.AMP.'C=addons_modules'.AMP.'M=show_module_cp'.AMP.'module=royalmissions'.AMP.'method=index');
         
     }
-    
+	
+	// ----------------------------------------------------------------
+
+	/**
+		*	Referral Account Actions
+		*	
+		*	Account actions
+		*
+	**/
+	
+	//Single initiator account view Unpaid Entries Only
     function referral_account_unpaid()
     {
     	$this->EE->load->library('table');
@@ -573,7 +610,8 @@ class Royalmissions_mcp {
 	    	return $this->EE->load->view('referral_account', $vars, TRUE);
 	    }
     }
-
+	
+	//Single initiator account view Paid Entries Only
     function referral_account_paid()
     {
     	$this->EE->load->library('table');
@@ -645,7 +683,8 @@ class Royalmissions_mcp {
 	    	return $this->EE->load->view('referral_account', $vars, TRUE);
 	    }
     }
-
+	
+	//Single initiator account view
     function referral_account()
     {
     	$this->EE->load->library('table');
@@ -735,7 +774,17 @@ class Royalmissions_mcp {
 	    	return $this->EE->load->view('referral_account', $vars, TRUE);
 	    }
     }
-    
+	
+	// ----------------------------------------------------------------
+
+	/**
+		*	Sync
+		*	
+		*	Syncs data between the various DB tables
+		*
+	**/
+	
+	//@@TODO - Reason
     function sync_no_redirect()
 	{
 		//Checks the DB tables... Members, Channel_Data, Royalmissions_User based off Members.member_id
@@ -815,49 +864,7 @@ class Royalmissions_mcp {
 		$vars['total_count'] = ($i+$t);
 	}
 
-	function profile_sync()
-	{
-		//Checks the DB tables... Members, Channel_Data, Royalmissions_User based off Members.member_id
-		$q = $this->EE->db->select('member_id, screen_name, field_id_12, field_id_13')
-			->from('members')
-			->join('channel_data', 'members.screen_name = channel_data.entry_id')
-			->where('channel_data.channel_id =', '6')
-			->get();
-				
-		if($q==false) show_error('Nothing Exists');
-		
-		$i = 0;
-
-   		foreach ($q->result_array() as $row)
-   		{
-	   		$members = array(
-	   			'initiator_id' => $row['member_id'],
-	   			'screen_name' => $row['field_id_12'].' '.$row['field_id_13'],
-	   			'zoo_id' => $row['screen_name']
-   			);
-   			
-   			$check = $this->EE->db->select('initiator_id')
-		   				->from('royalmissions_user')
-		   				->where('initiator_id', $members['initiator_id'])
-		   				->get();
-		   	if ( $check->num_rows() >= 1 )
-		   	{
-				$this->EE->db->where('initiator_id', $members['initiator_id'])
-					->update('royalmissions_user', $members);
-		    }
-		    else
-		    {
-				$this->EE->db->insert('royalmissions_user', $members);
-		    }
-			
-			$i++;
-   		}
-
-		$vars['total_count'] = $i;
-    	
-    	return $this->EE->load->view('profile_sync', $vars, TRUE);
-	}
-	
+	//replacing membrr_sub_sync logic
 	function test_sync()
 	{
 		//Grabs all data from CD and Membrr tables to populate the royalmissions table
@@ -938,185 +945,51 @@ class Royalmissions_mcp {
 		}
 	}
 	
-	function save_profile()
-    {
-    	if (empty($_POST))
-    	{
-    		show_error('unauthorized_access');
-    	}
-    	
-        unset($_POST['submit']);
-        $data = array();
-
-		foreach ($_POST as $key=>$val)
-        {
-        	if (is_array($val))
-        	{
-        		$data[$key] = serialize($val);
-        	}
-        	else
-        	{
-        		$data[$key] = $val;
-        	}
-        }
-        
-        $db_fields = $this->EE->db->list_fields('royalmissions_user');
-        foreach ($db_fields as $id=>$field)
-        {
-        	if (!isset($data[$field])) $data[$field] = '';
-        }
-      	//var_dump($data);
-        //$this->EE->db->update('royalmissions_user', $data, 'initiator_id = '.$data['initiator_id']);
-        
-		if ($this->EE->input->post('initiator_id')!='')
-        {
-            $this->EE->db->where('initiator_id', $this->EE->input->post('initiator_id'));
-            $this->EE->db->update('royalmissions_user', $data);
-        }
-
-        $vars['data'] = $data;
-        $this->EE->session->set_flashdata('message_success', 'updated');
-        
-        $this->EE->functions->redirect(BASE.AMP.'C=addons_modules'.AMP.'M=show_module_cp'.AMP.'module=royalmissions'.AMP.'method=referral_account'.AMP.'id='.$data['initiator_id']);
-		//return $this->EE->load->view('testing', $vars, TRUE);
-    }
-
-	function profile_edit()
+	//@@TODO - Reason
+	function profile_sync()
 	{
-		$this->EE->load->helper('form');
-    	$this->EE->load->library('table');  
-    	    	
-    	$js = '';
-    	    	
-		$theme_folder_url = trim($this->EE->config->item('theme_folder_url'), '/').'/third_party/royalmissions/';
-        $this->EE->cp->add_to_foot('<link type="text/css" href="'.$theme_folder_url.'multiselect/ui.multiselect.css" rel="stylesheet" />');
-        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/plugins/localisation/jquery.localisation-min.js"></script>');
-        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/plugins/blockUI/jquery.blockUI.js"></script>');
-        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/ui.multiselect.js"></script>');
-        
-       	$values = array(
-    		'profile_id' => false,
-			'initiator_id' => '',	
-			'screen_name' => '',
-			
-			'taxform_2014' => NULL,
-			'taxform_2015' => NULL,
-			'taxform_2016' => NULL,
-			'taxform_2017' => NULL,
-			'taxform_2018' => NULL,
-			'taxform_2019' => NULL,
-			'taxform_2020' => NULL,
-			
-			'zoo_id' => '',
-						
-			'active' => 1
-			
-		);
-
+		//Checks the DB tables... Members, Channel_Data, Royalmissions_User based off Members.member_id
+		$q = $this->EE->db->select('member_id, screen_name, field_id_12, field_id_13')
+			->from('members')
+			->join('channel_data', 'members.screen_name = channel_data.entry_id')
+			->where('channel_data.channel_id =', '6')
+			->get();
+				
+		if($q==false) show_error('Nothing Exists');
 		
-		if ($this->EE->input->get('id')!==false)
-		{
-			$q = $this->EE->db->select()
-					->from('royalmissions_user')
-					->where('initiator_id', $this->EE->input->get('id'))
-					->get();
-			if ($q->num_rows()==0)
-			{
-				show_error('Unauthorized Access');
-			}
+		$i = 0;
+
+   		foreach ($q->result_array() as $row)
+   		{
+	   		$members = array(
+	   			'initiator_id' => $row['member_id'],
+	   			'screen_name' => $row['field_id_12'].' '.$row['field_id_13'],
+	   			'zoo_id' => $row['screen_name']
+   			);
+   			
+   			$check = $this->EE->db->select('initiator_id')
+		   				->from('royalmissions_user')
+		   				->where('initiator_id', $members['initiator_id'])
+		   				->get();
+		   	if ( $check->num_rows() >= 1 )
+		   	{
+				$this->EE->db->where('initiator_id', $members['initiator_id'])
+					->update('royalmissions_user', $members);
+		    }
+		    else
+		    {
+				$this->EE->db->insert('royalmissions_user', $members);
+		    }
 			
-			foreach ($values as $field_name=>$default_field_val)
-			{
-				if (is_array($default_field_val))
-				{
-					$values["$field_name"] = ($q->row("$field_name")!='')?unserialize($q->row("$field_name")):array();
-				}
-				else
-				{
-					$values["$field_name"] = $q->row("$field_name");
-				}
-			}
-		}
-		
-		$this->EE->cp->add_js_script(
-			array('ui' => array(
-				'core', 'datepicker'
-			)
-		));
-		
-		$option = array(
-			'0' => 'No',
-			'1' => 'Yes'
-		);
+			$i++;
+   		}
 
-		$data['Profile Editing'] = array();
-		$data['Profile Editing']['show'] = true;
-		$data['Profile Editing']['Profile ID'] = $values['profile_id'].form_hidden('profile_id', $values['profile_id']);
-		$data['Profile Editing']['Initiator ID'] = $values['initiator_id'].form_hidden('initiator_id', $values['initiator_id']);
-		$data['Profile Editing']['Initiator Name'] = $values['screen_name'].form_hidden('screen_name', $values['screen_name']);           
-		$data['Profile Editing']['Tax Form 2014'] = form_dropdown('taxform_2014', $option, $values['taxform_2014']); 
-		$data['Profile Editing']['Tax Form 2015'] = form_dropdown('taxform_2015', $option, $values['taxform_2015']); 
-		$data['Profile Editing']['Tax Form 2016'] = form_dropdown('taxform_2016', $option, $values['taxform_2016']); 
-		$data['Profile Editing']['Tax Form 2017'] = form_dropdown('taxform_2017', $option, $values['taxform_2017']); 
-		$data['Profile Editing']['Tax Form 2018'] = form_dropdown('taxform_2018', $option, $values['taxform_2018']); 
-		$data['Profile Editing']['Tax Form 2019'] = form_dropdown('taxform_2019', $option, $values['taxform_2019']); 
-		$data['Profile Editing']['Tax Form 2020'] = form_dropdown('taxform_2020', $option, $values['taxform_2020']); 
-		$data['Profile Editing']['Unique Identifier'] = $values['zoo_id'].form_hidden('zoo_id', $values['zoo_id']);    
-		$data['Profile Editing']['Active'] = form_dropdown('active', $option, $values['active']); 
-
-        $js .= '
-				var draft_target = "";
-
-			$("<div id=\"referral_delete_warning\">referral delete warning</div>").dialog({
-				autoOpen: false,
-				resizable: false,
-				title: "confirm deleting",
-				modal: true,
-				position: "center",
-				minHeight: "0px", 
-				buttons: {
-					Cancel: function() {
-					$(this).dialog("close");
-					},
-				"delete": function() {
-					location=draft_target;
-				}
-				}});
-
-			$(".referral_delete_warning").click( function (){
-				$("#referral_delete_warning").dialog("open");
-				draft_target = $(this).attr("href");
-				$(".ui-dialog-buttonpane button:eq(2)").focus();	
-				return false;
-		});';
-		
-		$js .= "
-            $(\".editAccordion\").css(\"borderTop\", $(\".editAccordion\").css(\"borderBottom\")); 
-            $(\".editAccordion h3\").click(function() {
-                if ($(this).hasClass(\"collapsed\")) { 
-                    $(this).siblings().slideDown(\"fast\"); 
-                    $(this).removeClass(\"collapsed\").parent().removeClass(\"collapsed\"); 
-                } else { 
-                    $(this).siblings().slideUp(\"fast\"); 
-                    $(this).addClass(\"collapsed\").parent().addClass(\"collapsed\"); 
-                }
-            }); 
-        ";
-      
-        $js .= "
-            $(function() {
-				$(\"input.datepicker\").datepicker({ dateFormat: \"yy-mm-dd\" });
-			});
-        ";
-
-        $this->EE->javascript->output($js);
-        
-        $vars['data'] = $data;
-        
-    	return $this->EE->load->view('profile_edit', $vars, TRUE);
-
+		$vars['total_count'] = $i;
+    	
+    	return $this->EE->load->view('profile_sync', $vars, TRUE);
 	}
 	
+	//logic being replaced by test_sync
 	function membrr_sub_sync()
 	{
 		$this->sync_no_redirect();
@@ -1252,6 +1125,7 @@ class Royalmissions_mcp {
     	return $this->EE->load->view('profile_sync', $vars, TRUE);
 	}
 	
+	//tracks when syncs occur to remove errors of missing syncs
 	function sync_tracker()
 	{
 		$syncDB = array(
@@ -1266,12 +1140,198 @@ class Royalmissions_mcp {
     	
     	return $this->EE->load->view('profile_sync', $vars, TRUE);
 	}
-
+	
+	// ----------------------------------------------------------------
 
 	/**
-	 * Start on your custom code here...
-	 */
+		*	Profile
+		*	
+		*	Profile actions
+		*
+	**/
+	// Saves profile
+	// @returns success
+	function save_profile()
+    {
+    	if (empty($_POST))
+    	{
+    		show_error('unauthorized_access');
+    	}
+    	
+        unset($_POST['submit']);
+        $data = array();
+
+		foreach ($_POST as $key=>$val)
+        {
+        	if (is_array($val))
+        	{
+        		$data[$key] = serialize($val);
+        	}
+        	else
+        	{
+        		$data[$key] = $val;
+        	}
+        }
+        
+        $db_fields = $this->EE->db->list_fields('royalmissions_user');
+        foreach ($db_fields as $id=>$field)
+        {
+        	if (!isset($data[$field])) $data[$field] = '';
+        }
+      	//var_dump($data);
+        //$this->EE->db->update('royalmissions_user', $data, 'initiator_id = '.$data['initiator_id']);
+        
+		if ($this->EE->input->post('initiator_id')!='')
+        {
+            $this->EE->db->where('initiator_id', $this->EE->input->post('initiator_id'));
+            $this->EE->db->update('royalmissions_user', $data);
+        }
+
+        $vars['data'] = $data;
+        $this->EE->session->set_flashdata('message_success', 'updated');
+        
+        $this->EE->functions->redirect(BASE.AMP.'C=addons_modules'.AMP.'M=show_module_cp'.AMP.'module=royalmissions'.AMP.'method=referral_account'.AMP.'id='.$data['initiator_id']);
+		//return $this->EE->load->view('testing', $vars, TRUE);
+    }
 	
+	// @@TODO update to include json encoded items
+	// Edit profile fields
+	function profile_edit()
+	{
+		$this->EE->load->helper('form');
+    	$this->EE->load->library('table');  
+    	    	
+    	$js = '';
+    	    	
+		$theme_folder_url = trim($this->EE->config->item('theme_folder_url'), '/').'/third_party/royalmissions/';
+        $this->EE->cp->add_to_foot('<link type="text/css" href="'.$theme_folder_url.'multiselect/ui.multiselect.css" rel="stylesheet" />');
+        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/plugins/localisation/jquery.localisation-min.js"></script>');
+        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/plugins/blockUI/jquery.blockUI.js"></script>');
+        $this->EE->cp->add_to_foot('<script type="text/javascript" src="'.$theme_folder_url.'multiselect/ui.multiselect.js"></script>');
+        
+       	$values = array(
+    		'profile_id' => false,
+			'initiator_id' => '',	
+			'screen_name' => '',
+			
+			'taxform_2014' => NULL,
+			'taxform_2015' => NULL,
+			'taxform_2016' => NULL,
+			'taxform_2017' => NULL,
+			'taxform_2018' => NULL,
+			'taxform_2019' => NULL,
+			'taxform_2020' => NULL,
+			
+			'zoo_id' => '',
+						
+			'active' => 1
+			
+		);
+
+		
+		if ($this->EE->input->get('id')!==false)
+		{
+			$q = $this->EE->db->select()
+					->from('royalmissions_user')
+					->where('initiator_id', $this->EE->input->get('id'))
+					->get();
+			if ($q->num_rows()==0)
+			{
+				show_error('Unauthorized Access');
+			}
+			
+			foreach ($values as $field_name=>$default_field_val)
+			{
+				if (is_array($default_field_val))
+				{
+					$values["$field_name"] = ($q->row("$field_name")!='')?unserialize($q->row("$field_name")):array();
+				}
+				else
+				{
+					$values["$field_name"] = $q->row("$field_name");
+				}
+			}
+		}
+		
+		$this->EE->cp->add_js_script(
+			array('ui' => array(
+				'core', 'datepicker'
+			)
+		));
+		
+		$option = array(
+			'0' => 'No',
+			'1' => 'Yes'
+		);
+
+		$data['Profile Editing'] = array();
+		$data['Profile Editing']['show'] = true;
+		$data['Profile Editing']['Profile ID'] = $values['profile_id'].form_hidden('profile_id', $values['profile_id']);
+		$data['Profile Editing']['Initiator ID'] = $values['initiator_id'].form_hidden('initiator_id', $values['initiator_id']);
+		$data['Profile Editing']['Initiator Name'] = $values['screen_name'].form_hidden('screen_name', $values['screen_name']);           
+		$data['Profile Editing']['Tax Form 2014'] = form_dropdown('taxform_2014', $option, $values['taxform_2014']); 
+		$data['Profile Editing']['Tax Form 2015'] = form_dropdown('taxform_2015', $option, $values['taxform_2015']); 
+		$data['Profile Editing']['Tax Form 2016'] = form_dropdown('taxform_2016', $option, $values['taxform_2016']); 
+		$data['Profile Editing']['Tax Form 2017'] = form_dropdown('taxform_2017', $option, $values['taxform_2017']); 
+		$data['Profile Editing']['Tax Form 2018'] = form_dropdown('taxform_2018', $option, $values['taxform_2018']); 
+		$data['Profile Editing']['Tax Form 2019'] = form_dropdown('taxform_2019', $option, $values['taxform_2019']); 
+		$data['Profile Editing']['Tax Form 2020'] = form_dropdown('taxform_2020', $option, $values['taxform_2020']); 
+		$data['Profile Editing']['Unique Identifier'] = $values['zoo_id'].form_hidden('zoo_id', $values['zoo_id']);    
+		$data['Profile Editing']['Active'] = form_dropdown('active', $option, $values['active']); 
+
+        $js .= '
+				var draft_target = "";
+
+			$("<div id=\"referral_delete_warning\">referral delete warning</div>").dialog({
+				autoOpen: false,
+				resizable: false,
+				title: "confirm deleting",
+				modal: true,
+				position: "center",
+				minHeight: "0px", 
+				buttons: {
+					Cancel: function() {
+					$(this).dialog("close");
+					},
+				"delete": function() {
+					location=draft_target;
+				}
+				}});
+
+			$(".referral_delete_warning").click( function (){
+				$("#referral_delete_warning").dialog("open");
+				draft_target = $(this).attr("href");
+				$(".ui-dialog-buttonpane button:eq(2)").focus();	
+				return false;
+		});';
+		
+		$js .= "
+            $(\".editAccordion\").css(\"borderTop\", $(\".editAccordion\").css(\"borderBottom\")); 
+            $(\".editAccordion h3\").click(function() {
+                if ($(this).hasClass(\"collapsed\")) { 
+                    $(this).siblings().slideDown(\"fast\"); 
+                    $(this).removeClass(\"collapsed\").parent().removeClass(\"collapsed\"); 
+                } else { 
+                    $(this).siblings().slideUp(\"fast\"); 
+                    $(this).addClass(\"collapsed\").parent().addClass(\"collapsed\"); 
+                }
+            }); 
+        ";
+      
+        $js .= "
+            $(function() {
+				$(\"input.datepicker\").datepicker({ dateFormat: \"yy-mm-dd\" });
+			});
+        ";
+
+        $this->EE->javascript->output($js);
+        
+        $vars['data'] = $data;
+        
+    	return $this->EE->load->view('profile_edit', $vars, TRUE);
+
+	}
+		
 }
 /* End of file mcp.royalmissions.php */
 /* Location: /system/expressionengine/third_party/royalmissions/mcp.royalmissions.php */
